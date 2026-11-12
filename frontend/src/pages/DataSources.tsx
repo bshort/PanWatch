@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from '@panwatch/base-ui/components/ui/toast'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '@/i18n/format'
+import { localizeDataSourceName } from '@/i18n/seeded-labels'
 import { marketSignTextClass } from '@/lib/market-colors'
 
 interface TestLogItem {
@@ -301,7 +302,7 @@ export default function DataSourcesPage() {
                     <Database className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-medium text-foreground">{source.name}</span>
+                        <span className="text-[13px] font-medium text-foreground">{localizeDataSourceName(source.type, source.provider, source.name, configT)}</span>
                         {source.supports_batch && (
                           <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                             <Layers className="w-2.5 h-2.5" />
@@ -525,10 +526,10 @@ export default function DataSourcesPage() {
               ) : (
                 <X className="w-5 h-5 text-red-500" />
               )}
-              {t('configuration:dataSources.result.title', { name: testResult?.source_name || '' })}
+              {t('configuration:dataSources.result.title', { name: testResult ? localizeDataSourceName(testResult.source_type, testResult.provider, testResult.source_name, configT) : '' })}
             </DialogTitle>
             <DialogDescription>
-              {testResult?.type_label} · {testResult?.provider}
+              {testResult ? configT(`dataSources.types.${testResult.source_type}`, { defaultValue: testResult.type_label }) : ''} · {testResult?.provider}
               {testResult?.supports_batch && t('configuration:dataSources.result.batchSupported')}
             </DialogDescription>
           </DialogHeader>

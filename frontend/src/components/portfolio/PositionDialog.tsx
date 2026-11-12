@@ -8,6 +8,7 @@ import { Label } from '@panwatch/base-ui/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@panwatch/base-ui/components/ui/dialog'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@panwatch/base-ui/components/ui/select'
 import type { Account, PositionForm, SearchResult } from './types'
+import { localizeAccountName } from '@/i18n/seeded-labels'
 
 interface Props {
   positionDialogOpen: boolean
@@ -35,6 +36,7 @@ interface Props {
 }
 export function PositionDialog({ positionDialogOpen, setPositionDialogOpen, editPositionId, positionForm, setPositionForm, accounts, positionDialogAccountId, positionSearchQuery, setPositionSearchQuery, positionSearchResults, setPositionSearchResults, showPositionDropdown, setShowPositionDropdown, positionSearchMarket, setPositionSearchMarket, positionSearching, positionDropdownRef, handlePositionSearchMarketChange, handlePositionSearchInput, selectPositionStock, handlePositionSubmit, marketBadge }: Props) {
   const { t: stockT } = useTranslation('configuration')
+  const translate = stockT as unknown as (key: string, options?: Record<string, unknown>) => string
   return (
     <Dialog
       open={positionDialogOpen}
@@ -52,7 +54,7 @@ export function PositionDialog({ positionDialogOpen, setPositionDialogOpen, edit
         <DialogHeader>
           <DialogTitle>{editPositionId ? stockT('stocksPage.messages.editPosition') : stockT('stocksPage.messages.addPosition')}</DialogTitle>
           <DialogDescription>
-            {accounts.find(a => a.id === positionDialogAccountId)?.name} {stockT('stocksPage.messages.positionInfo')}
+            {localizeAccountName(accounts.find(a => a.id === positionDialogAccountId)?.name ?? '', translate)} {stockT('stocksPage.messages.positionInfo')}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-2">

@@ -27,6 +27,7 @@ import { DeepAnalysisModal } from '@panwatch/biz-ui/components/deep-analysis-mod
 import StockPriceAlertPanel from '@panwatch/biz-ui/components/stock-price-alert-panel'
 import { useTranslation } from 'react-i18next'
 import { localizeAgentDescription, localizeAgentName } from '@/i18n/agent-labels'
+import { localizeAccountName } from '@/i18n/seeded-labels'
 import { getCurrentLocale } from '@/i18n'
 import { browserTimezone } from '@panwatch/base-ui'
 import { applyMarketStatuses, mergePortfolioQuotes, toQuoteMap, type Position, type PortfolioSummary, type QuoteResponse, type DisplayQuote } from '@/lib/portfolio-quotes'
@@ -1652,7 +1653,7 @@ export default function StocksPage() {
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   )}
                   <Building2 className="w-4 h-4 text-primary" />
-                  <span className="text-[14px] md:text-[15px] font-semibold text-foreground">{account.name}</span>
+                  <span className="text-[14px] md:text-[15px] font-semibold text-foreground">{localizeAccountName(account.name, stockT)}</span>
                   <span className="text-[11px] md:text-[12px] text-muted-foreground">
                     {stockT('stocksPage.messages.positionCount', { count: account.positions.length })}
                   </span>
