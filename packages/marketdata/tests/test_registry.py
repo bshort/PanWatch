@@ -14,14 +14,14 @@ def test_package_vendors_by_type_content():
         "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance"}),
         "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo"}),
         "capital_flow": frozenset({"eastmoney", "sina"}),
-        "events": frozenset({"eastmoney"}),
+        "events": frozenset({"eastmoney", "sec", "yfinance"}),
         "flash_news": frozenset({"cls", "sina", "eastmoney"}),
-        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney"}),
-        "fundamentals": frozenset({"tencent", "eastmoney"}),
+        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney", "yahoo", "finnhub"}),
+        "fundamentals": frozenset({"tencent", "eastmoney", "yfinance"}),
         "dragon_tiger": frozenset({"eastmoney"}),
         "margin": frozenset({"eastmoney"}),
         "shareholders": frozenset({"eastmoney"}),
-        "dividend": frozenset({"eastmoney"}),
+        "dividend": frozenset({"eastmoney", "yfinance"}),
         "northbound": frozenset({"ths"}),
     }
 
@@ -33,7 +33,6 @@ def test_package_vendors_by_type_matches_actual_engine_registration():
         "quote": md._quote_engine,
         "kline": md._kline_engine,
         "capital_flow": md._capital_flow_engine,
-        "events": md._events_engine,
         "flash_news": md._flash_news_engine,
         "fundamentals": md._fundamentals_engine,
         "dragon_tiger": md._dragon_tiger_engine,
@@ -44,6 +43,9 @@ def test_package_vendors_by_type_matches_actual_engine_registration():
     }
     for datatype, engine in engines.items():
         assert set(engine.vendors.keys()) == PACKAGE_VENDORS_BY_TYPE[datatype]
+    # news and events aggregate across sources instead of failing over, so they hold vendors directly.
+    assert set(md._news_vendors.keys()) == PACKAGE_VENDORS_BY_TYPE["news"]
+    assert set(md._events_vendors.keys()) == PACKAGE_VENDORS_BY_TYPE["events"]
 
 
 def test_build_vendors_instantiates_all_registered_classes():

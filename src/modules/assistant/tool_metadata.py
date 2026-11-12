@@ -12,7 +12,7 @@ TOOL_PRESENTATIONS_EN: dict[str, tuple[str, str]] = {
     "get_notification_channels": ("Get notification channels", "Read channel IDs, names, types and enabled/default flags; never return secrets."),
     "get_watchlist": ("Get watchlist", "Read the saved watchlist with market-qualified symbols."),
     "get_research_history": ("Get research history", "Read market-scoped historical suggestions, reports and snapshots with dates and expiry."),
-    "get_stock_events": ("Get stock events", "Read CN announcements with source links, publication dates and IDs; HK/US regulatory filings are not covered."),
+    "get_stock_events": ("Get stock events", "Read CN announcements and US SEC filings / earnings dates with source links, publication dates and IDs; HK regulatory filings are not covered."),
     "get_event_details": ("Read announcement", "Verify an event ID against its instrument, then read original text; disclose unavailable content."),
     "get_portfolio": ("Get portfolio", "Read live and paper-trading positions, allocation, and a portfolio summary."),
     "get_stock_quote": ("Get live quote", "Read the latest price, change, and intraday quote data for a stock."),

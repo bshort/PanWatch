@@ -126,18 +126,21 @@ class SourceConfig:
 | `quote` | `Quote` | `tencent` / `sina` / `eastmoney` / `yfinance` | tencent: CN+HK+US;sina: US+HK;eastmoney: CN;yfinance: HK+US(可选依赖) | 按 symbol |
 | `kline` | `Bar` | `tencent` / `stooq` / `eastmoney` / `yahoo` | tencent: CN+HK+US;eastmoney: CN+HK;stooq: US;yahoo: US+HK | 按 symbol |
 | `capital_flow` | `CapitalFlow` | `eastmoney` / `sina` | eastmoney: CN+HK+US;sina: CN | 按 symbol |
-| `events` | `EventItem` | `eastmoney` | CN | 按 symbol |
+| `events` | `EventItem` | `eastmoney` / `sec` / `yfinance` | eastmoney: CN;sec: US(EDGAR 文件);yfinance: US+HK(财报日/除息日) | 按 symbol,**聚合**(见下) |
 | `flash_news` | `FlashNews` | `cls` / `sina` / `eastmoney` | 均 CN | **市场级**(symbols 恒空) |
-| `fundamentals` | `Fundamentals` | `tencent` / `eastmoney` | tencent: CN;eastmoney: CN+HK+US | 按 symbol |
+| `fundamentals` | `Fundamentals` | `tencent` / `eastmoney` / `yfinance` | tencent: CN;eastmoney: CN+HK+US;yfinance: US+HK | 按 symbol |
 | `dragon_tiger` | `DragonTigerItem` | `eastmoney` | CN | **市场级**(单日快照,按 date 过滤) |
 | `margin` | `MarginItem` | `eastmoney` | CN | 按 symbol(取最新一条) |
 | `shareholders` | `ShareholderItem` | `eastmoney` | CN | 按 symbol(取最新一期) |
-| `dividend` | `DividendItem` | `eastmoney` | CN | 按 symbol(返回全部历史) |
+| `dividend` | `DividendItem` | `eastmoney` / `yfinance` | eastmoney: CN;yfinance: US+HK | 按 symbol(返回全部历史) |
+| `news` | `NewsArticle` | `xueqiu` / `eastmoney_news` / `eastmoney` / `yahoo` / `finnhub` | 前三者 CN(中文,按名称检索也会覆盖 US/HK);yahoo: US(RSS);finnhub: US(需 API key) | 按 symbol,**聚合** |
 | `northbound` | `NorthboundItem` | `ths`(同花顺 hexin) | CN | **市场级**(symbols 恒空,取当日末值) |
 
 此外还有两类**不进 registry/不进 Engine**的特殊入口(市场级、非 symbol 模型,故不计入上述 11 类):
 - **discovery**(`hot_stocks`/`hot_boards`/`board_stocks`):东财热门榜,单源,直连 `DiscoveryVendor`。
 - **index**(`index_quotes`/`index_klines`):指数行情/K线,`index_quotes` 走腾讯原始符号,`index_klines` 走 `INDEX_SECID` 显式映射 + 东财K线。
+
+**聚合(news / events)**:不走 Engine 的主备,而是查询所有已启用且覆盖该市场的源并合并去重、按时间倒序。news 中覆盖请求市场的源拿到全部代码(原行为),其余市场的源只拿属于其市场的代码;events 传 `market=None` 时按代码识别市场分组。
 
 **故障转移**:Engine 按 `ConfigProvider` 返回的 priority 顺序试 vendor,过滤 `enabled` + `supports_markets`;首个"成功且非空(kline 为 ≥`min_count`)"即返回并缓存;全失败返回空。每次取数经 `MetricsSink` 记录,`health()` 可读。
 

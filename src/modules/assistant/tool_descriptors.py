@@ -257,7 +257,7 @@ PANWATCH_TOOL_DESCRIPTORS += tuple(
         ("get_notification_channels", "查询通知渠道", "读取可用通知渠道 ID，不暴露配置密钥", ["飞书", "渠道", "通知", "邮件", "telegram"], "price_alerts"),
         ("get_watchlist", "查询自选", "读取完整自选库与市场", ["自选", "watchlist"], "portfolio"),
         ("get_research_history", "查询历史研究", "读取上次研究观点、报告、快照和数据时间", ["上次", "历史", "之前", "研究", "建议"], "investment_research"),
-        ("get_stock_events", "查询公告事件", "读取 CN 公告事件、来源与发布时间", ["公告", "事件", "财报"], "market_data"),
+        ("get_stock_events", "查询公告事件", "读取 CN 公告与 US SEC 文件/财报日期、来源与发布时间", ["公告", "事件", "财报"], "market_data"),
         ("get_event_details", "读取公告全文", "核验公告编号并读取原始全文", ["公告全文", "公告内容", "解读公告", "这条公告"], "market_data"),
     )
 )

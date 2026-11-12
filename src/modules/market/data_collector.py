@@ -494,51 +494,7 @@ class DataCollectorManager:
                 await collector.close()
 
         elif source.type == "events":
-            from src.platform.marketdata.collectors.events_collector import EastMoneyEventsCollector
-
-            from datetime import timedelta
-
-            # Use a longer window for tests to avoid "recently empty" false negatives.
-            # This is only for connectivity/format validation, not for production logic.
-            lookback_days = 365
-            since = datetime.now() - timedelta(days=lookback_days)
-            if source.provider == "eastmoney":
-                cfg = source.config or {}
-                collector = EastMoneyEventsCollector(
-                    timeout_s=cfg.get("timeout_s", 10.0),
-                    connect_timeout_s=cfg.get("connect_timeout_s"),
-                    verify_ssl=cfg.get("verify_ssl", False),
-                    proxy=cfg.get("proxy"),
-                    retries=cfg.get("retries", 1),
-                    backoff_s=cfg.get("backoff_s", 0.6),
-                )
-                items = await collector.fetch_events(
-                    symbols=test_symbols[:_TEST_SYMBOL_LIMIT],
-                    since=since,
-                    page_size=100,
-                )
-                if not items and getattr(collector, "last_error", None):
-                    return CollectorResult(
-                        success=False,
-                        data=[],
-                        count=0,
-                        error=str(collector.last_error),
-                    )
-                return CollectorResult(
-                    success=len(items) > 0,
-                    data=[
-                        {
-                            "title": i.title[:80],
-                            "time": i.publish_time.strftime("%m-%d %H:%M"),
-                            "event_type": i.event_type,
-                        }
-                        for i in items[:10]
-                    ],
-                    count=len(items),
-                    error=""
-                    if items
-                    else f"未获取到事件数据（lookback={lookback_days}d）",
-                )
+            return await self._test_events_source(source, test_symbols)
 
         elif source.type == "flash_news":
             return await self._test_flash_news_source(source)
@@ -568,6 +524,7 @@ class DataCollectorManager:
     # 包内 kline/quote/flash_news/fundamentals Engine 各自只注册了这些 vendor(权威来源见 marketdata.PACKAGE_VENDORS_BY_TYPE)。
     # provider 不在这个集合里 = 包内没实现该源,测试应给出明确 error,不能构造 Engine 硬跑。
     _NEWS_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["news"]
+    _EVENTS_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["events"]
     _KLINE_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["kline"]
     _QUOTE_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["quote"]
     _FLASH_NEWS_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["flash_news"]
@@ -721,6 +678,53 @@ class DataCollectorManager:
             ],
             count=len(news),
             error="" if news else "未获取到新闻数据",
+        )
+
+    async def _test_events_source(
+        self, source: DataSource, test_symbols: list[str]
+    ) -> CollectorResult:
+        """按 provider 测试事件源:走 marketdata 包的单源配置(仅该 vendor)。
+
+        事件按 symbol 取,market=None 让每个测试代码落到所属市场(SEC/Yahoo 日历只覆盖 US,
+        东财只覆盖 CN)。测试用 365 天窗口,避免"近期恰好无公告"的假阴性。
+        """
+        from marketdata import MarketData, SourceConfig, StaticConfigProvider
+
+        if source.provider not in self._EVENTS_PACKAGE_VENDORS:
+            return CollectorResult(
+                success=False,
+                error=f"provider {source.provider} 无对应 vendor，包内未实现该事件源",
+            )
+
+        lookback_days = 365
+        cfg = source.config or {}
+        md = MarketData(
+            config=StaticConfigProvider(
+                {"events": [SourceConfig(vendor=source.provider, config=cfg, enabled=True)]}
+            )
+        )
+        try:
+            items = await asyncio.to_thread(
+                md.events,
+                list(test_symbols[:_TEST_SYMBOL_LIMIT]),
+                market=None,
+                since_days=lookback_days,
+            )
+        except Exception as e:
+            return CollectorResult(success=False, error=str(e))
+
+        return CollectorResult(
+            success=len(items) > 0,
+            data=[
+                {
+                    "title": i.title[:80],
+                    "time": i.publish_time.strftime("%m-%d %H:%M"),
+                    "event_type": i.event_type,
+                }
+                for i in items[:10]
+            ],
+            count=len(items),
+            error="" if items else f"未获取到事件数据（lookback={lookback_days}d）",
         )
 
     async def _test_flash_news_source(self, source: DataSource) -> CollectorResult:

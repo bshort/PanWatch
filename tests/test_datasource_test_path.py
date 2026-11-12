@@ -158,3 +158,35 @@ class TestKlineSourceTestPath(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEventsSourceTestPath(unittest.IsolatedAsyncioTestCase):
+    async def test_package_events_source_uses_single_vendor_and_market_detection(self):
+        """events 测试:任意包内 provider(如 sec)走单源配置,market=None 按代码识别市场。"""
+        from datetime import datetime, timezone
+
+        from marketdata import EventItem
+
+        calls = []
+
+        def fake_events(self, symbols, *, market="CN", since_days=7):
+            calls.append((self.config.sources_for("events", "US"), list(symbols), market, since_days))
+            return [EventItem(source="sec", external_id="0001", event_type="earnings", title="8-K: Results",
+                              publish_time=datetime(2026, 11, 1, tzinfo=timezone.utc), symbols=["AAPL"],
+                              importance=3, url="")]
+
+        with mock.patch("marketdata.MarketData.events", fake_events):
+            source = _make_source(type="events", provider="sec", test_symbols=["600519", "AAPL"])
+            result = await DataCollectorManager().test_source(source)
+
+        self.assertTrue(result.success, result.error)
+        self.assertEqual(result.count, 1)
+        srcs, symbols, market, since_days = calls[0]
+        self.assertEqual([s.vendor for s in srcs], ["sec"])
+        self.assertEqual((symbols, market, since_days), (["600519", "AAPL"], None, 365))
+
+    async def test_unknown_events_provider_fails_clearly(self):
+        source = _make_source(type="events", provider="nope", test_symbols=["AAPL"])
+        result = await DataCollectorManager().test_source(source)
+        self.assertFalse(result.success)
+        self.assertIn("nope", result.error)

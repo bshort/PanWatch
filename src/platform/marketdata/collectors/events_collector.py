@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import httpx
+from marketdata.client import event_sort_time
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,18 @@ def fetch_announcement_fulltext(
         return ""
 
 
+def _before(published: datetime, since: datetime) -> bool:
+    """True when an event is older than `since` (a naive local datetime).
+
+    CN vendors return naive times and keep the old naive comparison; US vendors
+    (SEC, Yahoo calendar) return aware times, compared in the server's local zone.
+    """
+    if published.tzinfo is None:
+        return published < since
+    local_since = since if since.tzinfo is not None else since.astimezone()
+    return published < local_since
+
+
 def get_market_data():
     """惰性导入,避免模块加载时的循环依赖(便于测试 monkeypatch)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
@@ -126,16 +139,17 @@ class EastMoneyEventsCollector:
             # (实际结果仍受上游 API page_size 条数限制,不会引入额外老旧数据)。
             since_days = 3650
 
+        # market=None: 按代码识别市场分组,混合自选(A 股 + 美股)各自走对应市场的事件源。
         md_items = await _asyncio.to_thread(
             get_market_data().events,
             symbols_list,
-            market="CN",
+            market=None,
             since_days=since_days,
         )
 
         result: list[EventItem] = []
         for it in md_items:
-            if since and it.publish_time < since:
+            if since and _before(it.publish_time, since):
                 continue
             result.append(
                 EventItem(
@@ -150,7 +164,7 @@ class EastMoneyEventsCollector:
                 )
             )
 
-        result.sort(key=lambda x: (x.publish_time, x.importance), reverse=True)
+        result.sort(key=lambda x: (event_sort_time(x.publish_time), x.importance), reverse=True)
 
         seen: set[tuple[str, str]] = set()
         uniq: list[EventItem] = []
@@ -232,7 +246,7 @@ class EventsCollector:
         for items in results:
             all_items.extend(items)
 
-        all_items.sort(key=lambda x: (x.publish_time, x.importance), reverse=True)
+        all_items.sort(key=lambda x: (event_sort_time(x.publish_time), x.importance), reverse=True)
         seen: set[tuple[str, str]] = set()
         uniq: list[EventItem] = []
         for it in all_items:

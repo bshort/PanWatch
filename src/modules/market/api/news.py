@@ -16,6 +16,8 @@ SOURCE_LABELS = {
     "xueqiu": "雪球",
     "eastmoney_news": "东财资讯",
     "eastmoney": "东财公告",
+    "yahoo": "Yahoo Finance",
+    "finnhub": "Finnhub",
 }
 
 

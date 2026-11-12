@@ -37,10 +37,18 @@ from marketdata.vendors.news import (
     EastmoneyStockNewsVendor,
     XueqiuNewsVendor,
 )
+from marketdata.vendors.finnhub import FinnhubNewsVendor
 from marketdata.vendors.northbound import HexinNorthboundVendor
+from marketdata.vendors.sec import SecFilingsVendor
 from marketdata.vendors.sina import SinaQuoteVendor
 from marketdata.vendors.tencent import TencentQuoteVendor
-from marketdata.vendors.yfinance import YFinanceQuoteVendor
+from marketdata.vendors.yahoo import YahooNewsVendor
+from marketdata.vendors.yfinance import (
+    YFinanceCalendarVendor,
+    YFinanceDividendVendor,
+    YFinanceFundamentalsVendor,
+    YFinanceQuoteVendor,
+)
 
 # 各数据类型 → {vendor name: vendor 类}。注意:vendor 的 import 本身是廉价的
 # (可选三方依赖如 yfinance 均在 fetch() 内部惰性 import),模块级导入不会引入重依赖。
@@ -63,10 +71,13 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
     },
     "events": {
         "eastmoney": EventsVendor,
+        "sec": SecFilingsVendor,
+        "yfinance": YFinanceCalendarVendor,
     },
     "fundamentals": {
         "tencent": TencentFundamentalsVendor,
         "eastmoney": EastmoneyFundamentalsVendor,
+        "yfinance": YFinanceFundamentalsVendor,
     },
     "flash_news": {
         "cls": ClsFlashNewsVendor,
@@ -77,6 +88,8 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "xueqiu": XueqiuNewsVendor,
         "eastmoney_news": EastmoneyStockNewsVendor,
         "eastmoney": EastmoneyAnnNewsVendor,
+        "yahoo": YahooNewsVendor,
+        "finnhub": FinnhubNewsVendor,
     },
     "dragon_tiger": {
         "eastmoney": EastmoneyDragonTigerVendor,
@@ -89,6 +102,7 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
     },
     "dividend": {
         "eastmoney": EastmoneyDividendVendor,
+        "yfinance": YFinanceDividendVendor,
     },
     "northbound": {
         "ths": HexinNorthboundVendor,

@@ -123,8 +123,8 @@ def register_context_tools(registry, bind, tool_spec) -> None:
 
     async def events(arguments):
         symbol, market = instrument(arguments)
-        if market != "CN":
-            raise ValueError("公告事件源当前仅覆盖 CN；HK/US 可检索新闻，不能声称已覆盖监管公告")
+        if market not in ("CN", "US"):
+            raise ValueError("公告事件源当前仅覆盖 CN/US；HK 可检索新闻，不能声称已覆盖监管公告")
         days = arguments.get("since_days", 30)
         if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365:
             raise ValueError("since_days 必须为 1–365 整数")
@@ -150,7 +150,7 @@ def register_context_tools(registry, bind, tool_spec) -> None:
         except Exception:
             return ToolResult.failure(summary="事件源暂时不可用", error_code="events_unavailable")
         items = [event_payload(e) for e in sorted(rows, key=lambda e: e.publish_time, reverse=True)[:limit]]
-        return ToolResult.success(summary=f"{market}:{symbol} 返回 {len(items)} 条公告事件；需 get_event_details 读取全文，不能只凭标题推断。", data={"symbol": symbol, "market": market, "items": items, "count": len(items), "since_days": arguments.get("since_days", 30)}, sources=[{"name": i["source"], "url": i["url"], "published_at": i["published_at"]} for i in items] or [{"name": "EastMoney 公告事件"}], observed_at=datetime.now(UTC))
+        return ToolResult.success(summary=f"{market}:{symbol} 返回 {len(items)} 条公告事件；" + ("需 get_event_details 读取全文，不能只凭标题推断。" if market == "CN" else "US 事件来自 SEC 文件与 Yahoo 日历，全文见 url，不能只凭标题推断。"), data={"symbol": symbol, "market": market, "items": items, "count": len(items), "since_days": arguments.get("since_days", 30)}, sources=[{"name": i["source"], "url": i["url"], "published_at": i["published_at"]} for i in items] or [{"name": "EastMoney 公告事件" if market == "CN" else "SEC EDGAR / Yahoo Finance"}], observed_at=datetime.now(UTC))
 
     async def get_event_details(request, arguments):
         event_id = str(arguments.get("external_id") or "")

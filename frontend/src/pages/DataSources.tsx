@@ -116,6 +116,12 @@ const PROVIDER_CREDENTIAL_FIELDS: Record<string, CredentialFieldDef[]> = {
   xueqiu: [
     { key: 'cookies', labelKey: 'dataSources.credentials.xueqiuLabel', placeholderKey: 'dataSources.credentials.xueqiuPlaceholder', secret: true, helpKey: 'dataSources.credentials.xueqiuHelp' },
   ],
+  finnhub: [
+    { key: 'api_key', labelKey: 'dataSources.credentials.finnhubLabel', placeholderKey: 'dataSources.credentials.finnhubPlaceholder', secret: true, helpKey: 'dataSources.credentials.finnhubHelp' },
+  ],
+  sec: [
+    { key: 'user_agent', labelKey: 'dataSources.credentials.secLabel', placeholderKey: 'dataSources.credentials.secPlaceholder', helpKey: 'dataSources.credentials.secHelp' },
+  ],
 }
 
 const emptyForm: DataSourceForm = {

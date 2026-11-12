@@ -609,6 +609,77 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "supports_batch": False,
             "test_symbols": [],
         },
+        # 美股数据源(US):Yahoo/YFinance 国内通常需代理,默认关;SEC 免 key;Finnhub 需免费 API key
+        {
+            "name": "Yahoo 资讯",
+            "type": "news",
+            "provider": "yahoo",
+            "config": {
+                "description": "Yahoo Finance 个股新闻 RSS(US,免 key)。国内访问通常需代理,在 config.proxy 填写。",
+                "proxy": "",
+            },
+            "enabled": False,
+            "priority": 3,
+            "supports_batch": False,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
+        {
+            "name": "Finnhub 资讯",
+            "type": "news",
+            "provider": "finnhub",
+            "config": {
+                "description": "Finnhub 个股新闻(US)。需在 finnhub.io 免费注册 API key,或设环境变量 FINNHUB_API_KEY。",
+                "api_key": "",
+            },
+            "enabled": False,
+            "priority": 4,
+            "supports_batch": False,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
+        {
+            "name": "SEC 公告",
+            "type": "events",
+            "provider": "sec",
+            "config": {
+                "description": "SEC EDGAR 监管文件(US,免 key):10-K/10-Q/8-K/内部人交易等。"
+                "SEC 要求标明 User-Agent,建议在 config.user_agent 填写“名称 邮箱”。",
+                "user_agent": "",
+            },
+            "enabled": True,
+            "priority": 1,
+            "supports_batch": True,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
+        {
+            "name": "YFinance 财报日历",
+            "type": "events",
+            "provider": "yfinance",
+            "config": {"description": "Yahoo Finance 下次财报日与除息日(US/HK)。国内访问通常需代理。"},
+            "enabled": False,
+            "priority": 2,
+            "supports_batch": False,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
+        {
+            "name": "YFinance 基本面",
+            "type": "fundamentals",
+            "provider": "yfinance",
+            "config": {"description": "Yahoo Finance 估值与财务指标(US/HK):PE/PB/市值/ROE/毛利率等。国内访问通常需代理。"},
+            "enabled": False,
+            "priority": 3,  # 启用后在东财(5)之前,作 US/HK 首选
+            "supports_batch": False,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
+        {
+            "name": "YFinance 分红",
+            "type": "dividend",
+            "provider": "yfinance",
+            "config": {"description": "Yahoo Finance 现金分红历史(US/HK,按除息日)。国内访问通常需代理。"},
+            "enabled": False,
+            "priority": 1,
+            "supports_batch": False,
+            "test_symbols": list(DEFAULT_TEST_SYMBOLS),
+        },
         # K线截图数据源
         {
             "name": "雪球K线截图",

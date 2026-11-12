@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from marketdata.cache import TTLCache
 from marketdata.defaults import InMemoryMetricsSink
@@ -11,7 +12,7 @@ from marketdata.engine import Engine
 from marketdata.http import record_error
 from marketdata.ports import ConfigProvider, MetricsSink
 from marketdata.registry import build_vendors
-from marketdata.symbol import Symbol
+from marketdata.symbol import Market, Symbol
 from marketdata.types import (
     CapitalFlow,
     DividendItem,
@@ -55,6 +56,29 @@ INDEX_TENCENT: dict[str, str] = {
 }
 
 
+_CN_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def event_sort_time(dt: datetime) -> datetime:
+    """Comparable (aware) time for an event. CN vendors return naive exchange-local times."""
+    return dt.replace(tzinfo=_CN_TZ) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def _symbols_for_vendor(vendor, market: str, raw: list[str], syms: list[Symbol]) -> list[Symbol]:
+    """Symbols a news vendor should get.
+
+    A vendor that covers the request's market gets every symbol, as before (the
+    Chinese-language CN sources also search US/HK names). A vendor for other
+    markets gets only the symbols whose code belongs to one of its markets, so a
+    mixed watchlist still reaches the US sources when the request says CN.
+    """
+    supported = vendor.supports_markets
+    if not supported or market in supported:
+        return syms
+    picked = [Symbol.parse(code) for code in raw]
+    return [s for s in picked if s.market.value in supported]
+
+
 class MarketData:
     def __init__(self, config: ConfigProvider, metrics: MetricsSink | None = None):
         self.config = config
@@ -79,12 +103,8 @@ class MarketData:
             config=config, metrics=self.metrics,
             cache=TTLCache(default_ttl_sec=0.0), default_ttl=0.0,
         )
-        self._events_engine = Engine(
-            datatype="events",
-            vendors=build_vendors("events"),
-            config=config, metrics=self.metrics,
-            cache=TTLCache(default_ttl_sec=0.0), default_ttl=0.0,
-        )
+        # events 与 news 一样是聚合语义(各源互补:CN 东财公告;US SEC 文件 + Yahoo 日历),不进 Engine。
+        self._events_vendors = build_vendors("events")
         # flash_news(快讯 7×24)是市场级(symbols 恒空),但仍走 Engine 做主备/缓存/健康度,
         # 与 discovery(不进 Engine)的区别是:flash_news 有多源竞争、需要统一 TTL 缓存。
         self._flash_news_engine = Engine(
@@ -202,12 +222,59 @@ class MarketData:
         data = resp.data or []
         return data[0] if data else None
 
-    def events(self, symbols: list[str], *, market: str = "CN", since_days: int = 7) -> list[EventItem]:
-        """结构化事件(东财公告)。批量 symbols。不在包内缓存(cache_ttl_sec=0);宿主自行缓存。"""
-        req = Request(symbols=tuple(symbols), market=market, since_hours=since_days * 24,
-                      extra=(("since_days", since_days),))
-        resp = self._events_engine.fetch(req, cache_ttl_sec=0)
-        return resp.data or []
+    def events(self, symbols: list[str], *, market: str | None = "CN", since_days: int = 7) -> list[EventItem]:
+        """Structured events (announcements, filings, calendar dates). Not cached here.
+
+        Aggregates like news(): every enabled source that covers the market is
+        queried and the results are merged, because sources complement each other
+        (US: SEC filings plus Yahoo's earnings/ex-dividend calendar) rather than
+        being backups. market=None groups the symbols by the market their code
+        implies, so a mixed watchlist reaches each market's sources.
+        Sorted newest first; naive times (CN vendors) are read as Asia/Shanghai.
+        """
+        if market is None:
+            groups: dict[str, list[str]] = {}
+            for code in symbols:
+                groups.setdefault(Symbol.parse(code).market.value, []).append(code)
+        else:
+            groups = {market: list(symbols)}
+
+        merged: list[EventItem] = []
+        for mkt, codes in groups.items():
+            syms = [Symbol(Market(mkt), c) for c in codes]
+            srcs = sorted(self.config.sources_for("events", mkt), key=lambda s: s.priority)
+            for src in srcs:
+                if not src.enabled:
+                    continue
+                vendor = self._events_vendors.get(src.vendor)
+                if vendor is None:
+                    continue
+                if vendor.supports_markets and mkt not in vendor.supports_markets:
+                    continue
+                call_config = {**(src.config or {}), "since_days": since_days}
+                t0 = time.monotonic()
+                try:
+                    items = vendor.fetch(syms, call_config) or []
+                except Exception as e:
+                    self.metrics.record(vendor=src.vendor, datatype="events", market=mkt, ok=False,
+                                        count=0, latency_ms=int((time.monotonic() - t0) * 1000), error=str(e))
+                    record_error(f"{src.vendor}: {type(e).__name__}: {e}")
+                    continue
+                latency = int((time.monotonic() - t0) * 1000)
+                self.metrics.record(vendor=src.vendor, datatype="events", market=mkt, ok=bool(items),
+                                    count=len(items), latency_ms=latency, error="" if items else "empty")
+                merged.extend(items)
+
+        seen: set[tuple[str, str]] = set()
+        uniq: list[EventItem] = []
+        for ev in merged:
+            key = (ev.source, ev.external_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            uniq.append(ev)
+        uniq.sort(key=lambda e: (event_sort_time(e.publish_time), e.importance), reverse=True)
+        return uniq
 
     def flash_news(self, *, market: str = "CN", limit: int = 50, keyword: str | None = None) -> list[FlashNews]:
         """快讯(7×24)。市场级,symbols 恒空。不在包内缓存额外一层——用 Engine 默认 30s TTL。"""
@@ -250,7 +317,8 @@ class MarketData:
             vendor = self._news_vendors.get(src.vendor)
             if vendor is None:
                 continue
-            if vendor.supports_markets and market not in vendor.supports_markets:
+            vendor_syms = _symbols_for_vendor(vendor, market, symbols, syms)
+            if not vendor_syms:
                 continue
 
             window = max(since_hours, 72) if src.vendor == "eastmoney" else since_hours
@@ -258,7 +326,7 @@ class MarketData:
 
             t0 = time.monotonic()
             try:
-                articles = vendor.fetch(syms, call_config) or []
+                articles = vendor.fetch(vendor_syms, call_config) or []
             except Exception as e:
                 latency = int((time.monotonic() - t0) * 1000)
                 self.metrics.record(vendor=src.vendor, datatype="news", market=market,

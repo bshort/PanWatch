@@ -85,3 +85,37 @@ def test_fetch_events_applies_since_filter(monkeypatch):
 
     assert len(out) == 1
     assert out[0].external_id == "NEW"
+
+
+def test_fetch_events_mixed_markets_and_timezones(monkeypatch):
+    """A watchlist mixing A-shares and US tickers asks marketdata to group by market
+    (market=None), and naive CN times sort and filter next to aware US times."""
+    from datetime import timezone
+
+    from marketdata.types import EventItem as MdEventItem
+
+    seen = {}
+    now_utc = datetime.now(timezone.utc)
+
+    class _MD:
+        def events(self, symbols, *, market="CN", since_days=7):
+            seen["market"], seen["symbols"] = market, symbols
+            return [
+                MdEventItem(source="eastmoney", external_id="CN1", event_type="notice", title="公告",
+                            publish_time=datetime.now() - timedelta(days=1), symbols=["600519"],
+                            importance=0, url=""),
+                MdEventItem(source="sec", external_id="S1", event_type="earnings", title="8-K",
+                            publish_time=now_utc - timedelta(hours=1), symbols=["AAPL"],
+                            importance=3, url=""),
+                MdEventItem(source="sec", external_id="S_OLD", event_type="notice", title="old",
+                            publish_time=now_utc - timedelta(days=20), symbols=["AAPL"],
+                            importance=0, url=""),
+            ]
+
+    monkeypatch.setattr(ec, "get_market_data", lambda: _MD())
+
+    since = datetime.now() - timedelta(days=7)
+    out = asyncio.run(ec.EastMoneyEventsCollector().fetch_events(["600519", "AAPL"], since=since))
+
+    assert seen == {"market": None, "symbols": ["600519", "AAPL"]}
+    assert [e.external_id for e in out] == ["S1", "CN1"]
